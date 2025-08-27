@@ -51,7 +51,7 @@ void convertir_a_grises(PALETARGB* paleta, int num_colores) {
     }
 
 }
-
+"""
 for:
     mov eax, [ebp+8]
     mov ebx,0
@@ -82,7 +82,7 @@ for:
     inc eax
     jmp for
 
-
+"""
 //Modo de uso: bitmap <archivobmp>
 // genera archivo salida.bmp
 int main (int argc, char* argv[]) {
