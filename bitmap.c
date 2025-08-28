@@ -175,4 +175,3 @@ int main (int argc, char* argv[]) {
     printf("Imagen convertida a escala de grises y guardada como 'salida.bmp'\n");
     return 0;
 }
-
