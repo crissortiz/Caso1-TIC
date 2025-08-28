@@ -9,7 +9,7 @@
 //sin agregar relleno (padding) entre los campos.
 typedef struct {
     unsigned short bfType;      // 'BM'
-    unsigned int  bfSize;      // Tama o del archivo
+    unsigned int  bfSize;      // Tama o del archivo    mov dword ptr [ebp-4], 0 //i
     unsigned short bfReserved1;
     unsigned short bfReserved2;
     uint32_t bfOffBits;   // Offset hasta los datos de imagen
@@ -51,38 +51,113 @@ void convertir_a_grises(PALETARGB* paleta, int num_colores) {
     }
 
 }
-"""
-for:
-    mov eax, [ebp+8]
-    mov ebx,0
-    cmp ebx, num_colores
-    jge fin
-    mul ebx, 4
-    mov ecx, paleta
-    add ecx, ebx
-    
-    mov edx, [ecx + 4]
-    push edx
-    mov edx, [ecx + 3]
-    push edx
-    mov edx, [ecx + 2]
 
-    pop edx
-    pop eax
+void convertir_a_grises_asm2(PALETARGB* paleta, int num_colores) {
+__asm {
+    ; i está en [ebp-4]
+    ; gris está en [ebp-8]
+    ; paleta está en [ebp+8]
+    ; num_colores está en [ebp+12]
+
+    mov dword ptr [ebp-4], 0      ; i = 0
+
+ciclo:
+    mov eax, [ebp-4]              ; eax = i
+    cmp eax, [ebp+12]             ; comparar con num_colores
+    jge fin_ciclo
+
+    ; calcular &paleta[i]
+    mov ecx, [ebp+8]              ; ecx = paleta
+    mov edx, [ebp-4]              ; edx = i
+    shl edx, 2                    ; edx = i*4
+    add ecx, edx                  ; ecx = &paleta[i]
+
+    ; sumar R + G + B
+    movzx eax, byte ptr [ecx+2]   ; eax = Red
+    movzx edx, byte ptr [ecx+1]   ; edx = Green
     add eax, edx
-    add eax, ebx
+    movzx edx, byte ptr [ecx+0]   ; edx = Blue
+    add eax, edx
+
+    ; dividir entre 3
+    xor edx, edx
     mov ebx, 3
-    idiv eax, ebx
+    div ebx                        ; eax = (R+G+B)/3
+    mov [ebp-8], eax              ; gris = eax
 
-    mov [ecx + 4], eax
-    mov [ecx + 3], eax
-    mov [ecx + 2], eax
+    ; escribir gris en la paleta
+    mov dl, byte ptr [ebp-8]
+    mov [ecx+2], dl
+    mov [ecx+1], dl
+    mov [ecx+0], dl
 
-    pop eax
-    inc eax
-    jmp for
+    ; i++
+    inc dword ptr [ebp-4]
+    jmp ciclo
 
-"""
+fin_ciclo:
+    ; (sin epílogo manual, lo pone el compilador)
+}
+}
+
+void convertir_a_grises_asm(PALETARGB* paleta, int num_colores) {
+    __asm {
+/*Prologo
+push ebp
+mov ebp, esp
+sub esp, 8
+*/
+
+/* variables */
+push ebx
+push ecx
+push edx
+push edi
+
+mov dword ptr [ebp-4], 0 //i
+
+ciclo:
+mov ebx, [ebp-4] //ebx = i
+mov eax, [ebp+12] //eax = num_colores
+cmp ebx, eax
+jge fin_ciclo
+mov ecx, [ebp+8] //ecx = paleta
+mov eax, ebx
+imul eax, 4 //eax = i * 4 (porque cada PALETARGB tiene 4 bytes)
+add ecx, eax //ecx = paleta[i]
+
+mov eax, ecx //eax = paleta[i]
+movzx eax, byte ptr [ecx+2] //eax = paleta[i].rgbRed
+movzx edx, byte ptr [ecx+1] //edx = paleta[i].rgbGreen
+add eax, edx
+movzx edx, byte ptr [ecx+0] //edx = paleta[i].rgbBlue
+add eax, edx
+mov edx, 0
+mov edi, 3
+div edi 
+
+mov dl, al
+mov [ecx+2], dl
+mov [ecx+1], dl
+mov [ecx+0], dl
+
+add dword ptr [ebp-4], 1
+jmp ciclo
+
+fin_ciclo:
+/*Eplilogo
+mov esp, ebp
+pop edi
+pop edx
+pop ecx
+pop ebx
+add esp, 8
+pop ebp
+ret
+*/
+    }
+}
+
 //Modo de uso: bitmap <archivobmp>
 // genera archivo salida.bmp
 int main (int argc, char* argv[]) {
@@ -143,7 +218,7 @@ int main (int argc, char* argv[]) {
     fclose(in);
 
     // Convertir paleta a escala de grises
-    convertir_a_grises(paleta, 256);
+    convertir_a_grises_asm2(paleta, 256);
 
     // Escribir archivo de salida
     FILE* out = fopen("salida.bmp", "wb");
